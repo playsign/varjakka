@@ -23,12 +23,17 @@ public class DefaultTrackableEventHandler : MonoBehaviour, ITrackableEventHandle
     protected TrackableBehaviour.Status m_PreviousStatus;
     protected TrackableBehaviour.Status m_NewStatus;
 
+    public static GameObject currentTrackable;
+    public static GameObject otherTrackable;
+
     #endregion // PROTECTED_MEMBER_VARIABLES
 
     #region UNITY_MONOBEHAVIOUR_METHODS
 
     protected virtual void Start()
     {
+        currentTrackable = null;
+
         mTrackableBehaviour = GetComponent<TrackableBehaviour>();
         if (mTrackableBehaviour)
             mTrackableBehaviour.RegisterTrackableEventHandler(this);
@@ -57,15 +62,18 @@ public class DefaultTrackableEventHandler : MonoBehaviour, ITrackableEventHandle
 
         if (newStatus == TrackableBehaviour.Status.DETECTED ||
             newStatus == TrackableBehaviour.Status.TRACKED ||
-            newStatus == TrackableBehaviour.Status.EXTENDED_TRACKED)
+            newStatus == TrackableBehaviour.Status.EXTENDED_TRACKED) 
+            /* NOTE: we may want special logic to deal with extended vs multi targets:
+                - if old target is used with EXTENDED, but new is TRACKED, we want to switch to new
+            */
         {
-            Debug.Log("Trackable " + mTrackableBehaviour.TrackableName + " found");
+            //Debug.Log("Trackable " + mTrackableBehaviour.TrackableName + " found");
             OnTrackingFound();
         }
         else if (previousStatus == TrackableBehaviour.Status.TRACKED &&
                  newStatus == TrackableBehaviour.Status.NO_POSE)
         {
-            Debug.Log("Trackable " + mTrackableBehaviour.TrackableName + " lost");
+            //Debug.Log("Trackable " + mTrackableBehaviour.TrackableName + " lost");
             OnTrackingLost();
         }
         else
@@ -82,6 +90,49 @@ public class DefaultTrackableEventHandler : MonoBehaviour, ITrackableEventHandle
     #region PROTECTED_METHODS
 
     protected virtual void OnTrackingFound()
+    {
+        string name = gameObject.name;
+        //Debug.Log("Tracking found: " + name);
+
+        if (currentTrackable == null) {
+            currentTrackable = gameObject;
+            Debug.Log("Current trackable set to: " + name);
+            showChild();
+        } else {
+            //NOTE: we may get this Found call even when this target was already tracked.
+            //maybe related to how both TRACKED and EXTENDED_TRACKED result in call to here.
+            if (gameObject != currentTrackable &&
+                gameObject != otherTrackable) 
+            {
+                Debug.Log($"Remember additional trackable for later {gameObject.name} - is tracking {currentTrackable.name} already");
+                otherTrackable = gameObject;
+            }
+        }
+    }
+
+    protected virtual void OnTrackingLost()
+    {
+        string name = gameObject.name;
+        Debug.Log("Tracking lost: " + name);
+
+        if (gameObject == currentTrackable) {
+            if (otherTrackable != null) {
+                otherTrackable.GetComponent<DefaultTrackableEventHandler>().showChild();
+                currentTrackable = otherTrackable;
+                otherTrackable = null;                
+            } else {
+                currentTrackable = null;
+            }
+        }
+
+        else if (gameObject == otherTrackable) {
+            otherTrackable = null;
+        }
+
+        hideChild();
+    }
+
+    public void showChild()
     {
         var rendererComponents = GetComponentsInChildren<Renderer>(true);
         var colliderComponents = GetComponentsInChildren<Collider>(true);
@@ -100,8 +151,7 @@ public class DefaultTrackableEventHandler : MonoBehaviour, ITrackableEventHandle
             component.enabled = true;
     }
 
-
-    protected virtual void OnTrackingLost()
+    private void hideChild()
     {
         var rendererComponents = GetComponentsInChildren<Renderer>(true);
         var colliderComponents = GetComponentsInChildren<Collider>(true);
@@ -118,6 +168,7 @@ public class DefaultTrackableEventHandler : MonoBehaviour, ITrackableEventHandle
         // Disable canvas':
         foreach (var component in canvasComponents)
             component.enabled = false;
+
     }
 
     #endregion // PROTECTED_METHODS
