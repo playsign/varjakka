@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI; 
 
 public class CameraManager : MonoBehaviour {
     public GameObject ARCam;
@@ -21,6 +22,9 @@ public class CameraManager : MonoBehaviour {
         EnvironmentView.SetActive(tofree);
         //cam is in there here
         //FreeCam.SetActive(tofree);
+
+        // Hide the "3D" button when going into AR mode
+        GameObject.Find("Background").GetComponent<Image>().enabled = !tofree;
     }
 
     // Use this for initialization
