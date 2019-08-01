@@ -1,7 +1,5 @@
-// Upgrade NOTE: replaced 'mul(UNITY_MATRIX_MVP,*)' with 'UnityObjectToClipPos(*)'
-
 /*===============================================================================
-Copyright 2017-2018 PTC Inc.
+Copyright 2019 PTC Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License"); you may not
 use this file except in compliance with the License. You may obtain a copy of
@@ -18,73 +16,50 @@ specific language governing permissions and limitations under the License.
 Shader "Custom/VideoBackground" {
     // Used to render the Vuforia Video Background
 
- Properties
+    Properties
     {
-        // we have removed support for texture tiling/offset,
-        // so make them not be displayed in material inspector
-        [NoScaleOffset] _MainTex ("Texture", 2D) = "white" {}
+        [NoScaleOffset] _MainTex("Texture", 2D) = "white" {}
+        [NoScaleOffset] _UVTex1("UV Texture 1", 2D) = "white" {}
+        [NoScaleOffset] _UVTex2("UV Texture 2", 2D) = "white" {}
     }
+
     SubShader
     {
-    Tags { "QUEUE"="geometry-11" "RenderType"="Opaque" }
-        Pass
-        {
-            Tags { "QUEUE"="geometry-11" "RenderType"="Opaque" }
+        Tags {"Queue" = "geometry-11" "RenderType" = "opaque" }
+        Pass {
             ZWrite Off
             Cull Off
-            
+            Lighting Off
+
             CGPROGRAM
-            // use "vert" function as the vertex shader
-            #pragma vertex vert
-            // use "frag" function as the pixel (fragment) shader
-            #pragma fragment frag
-			
-			#include "UnityCG.cginc"
 
-            // vertex shader inputs
-            struct appdata
-            {
-                float4 vertex : POSITION; // vertex position
-                float2 uv : TEXCOORD0; // texture coordinate
-            };
+        //Custom Shaderwords for different texture formats
+        #pragma multi_compile VUFORIA_RGB VUFORIA_YUVNV12 VUFORIA_YUVNV21 VUFORIA_YUV420P VUFORIA_YUVYV12
 
-            // vertex shader outputs ("vertex to fragment")
-            struct v2f
-            {
-                float2 uv : TEXCOORD0; // texture coordinate
-                float4 vertex : SV_POSITION; // clip space position
-            };
+        #pragma vertex vert
+        #pragma fragment frag
 
-            // vertex shader
-            v2f vert (appdata v)
-            {
-                v2f o;
-                // transform position to clip space
-                // (multiply with model*view*projection matrix)
-                o.vertex = UnityObjectToClipPos(v.vertex);
-                // just pass the texture coordinate
-                o.uv = v.uv;
-                return o;
-            }
-            
-            // texture we will sample
-            sampler2D _MainTex;
+        #include "UnityCG.cginc"
+        #include "VuforiaVideoBackground.cginc"
 
-            // pixel shader; returns low precision ("fixed4" type)
-            // color ("SV_Target" semantic)
-            fixed4 frag (v2f i) : SV_Target
-            {
-                // sample texture and return it
-                fixed4 col = tex2D(_MainTex, i.uv);
-				
-            #ifdef UNITY_COLORSPACE_GAMMA
-                return col;
-            #else
-                return fixed4(GammaToLinearSpace(col.rgb), col.a);
-            #endif	
-            }
-            ENDCG
+        v2f vert(appdata_base v)
+        {
+            return vuforiaConvertRGBVert(v);
         }
+
+        half4 frag(v2f i) : COLOR
+        {
+            half4 c = vuforiaConvertRGBFrag(i);
+
+#ifdef UNITY_COLORSPACE_GAMMA
+            return c;
+#else
+            return half4(GammaToLinearSpace(c.rgb), c.a);
+#endif	
+        }
+
+        ENDCG
+    }
     }
     Fallback "Legacy Shaders/Diffuse"
 }
