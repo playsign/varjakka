@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<QCARConfig xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="qcar_config.xsd">
+  <Tracking>
+    <ImageTarget name="oulupostcard-pekuri" size="0.200000 0.142287" />
+    <ImageTarget name="oulupostcard-random" size="0.200000 0.141016" />
+    <ImageTarget name="RacingMarker" size="0.200000 0.120590" />
+  </Tracking>
+</QCARConfig>
