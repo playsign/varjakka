@@ -48,16 +48,23 @@ public class DefaultTrackableEventHandler : MonoBehaviour, ITrackableEventHandle
     ///     Implementation of the ITrackableEventHandler function called when the
     ///     tracking state changes.
     /// </summary>
-    public void OnTrackableStateChanged(
+    public virtual void OnTrackableStateChanged(
         TrackableBehaviour.Status previousStatus,
         TrackableBehaviour.Status newStatus)
     {
         m_PreviousStatus = previousStatus;
         m_NewStatus = newStatus;
-        
-        Debug.Log("Trackable " + mTrackableBehaviour.TrackableName + 
-                  " " + mTrackableBehaviour.CurrentStatus +
-                  " -- " + mTrackableBehaviour.CurrentStatusInfo);
+
+        if (mTrackableBehaviour != null)
+        {
+            Debug.Log("Trackable " + mTrackableBehaviour.TrackableName +
+                      " " + mTrackableBehaviour.CurrentStatus +
+                      " -- " + mTrackableBehaviour.CurrentStatusInfo);
+        } else
+        {
+            Debug.Log("mTrackableBehaviour null at OnTrackableStateChanged");
+
+        }
 
         if (newStatus == TrackableBehaviour.Status.DETECTED ||
             newStatus == TrackableBehaviour.Status.TRACKED ||

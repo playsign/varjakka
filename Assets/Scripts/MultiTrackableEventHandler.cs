@@ -1,11 +1,3 @@
-/*==============================================================================
-Copyright (c) 2019 PTC Inc. All Rights Reserved.
-
-Copyright (c) 2010-2014 Qualcomm Connected Experiences, Inc.
-All Rights Reserved.
-Confidential and Proprietary - Protected under copyright and other laws.
-==============================================================================*/
-
 using UnityEngine;
 using Vuforia;
 
@@ -17,115 +9,105 @@ using Vuforia;
 /// </summary>
 public class MultiTrackableEventHandler : DefaultTrackableEventHandler
 {
-    #region PROTECTED_MEMBER_VARIABLES
-
-    protected TrackableBehaviour mTrackableBehaviour;
-    protected TrackableBehaviour.Status m_PreviousStatus;
-    protected TrackableBehaviour.Status m_NewStatus;
-
-    #endregion // PROTECTED_MEMBER_VARIABLES
+    public static GameObject currentTrackable;
+    public static GameObject otherTrackable;
 
     #region UNITY_MONOBEHAVIOUR_METHODS
 
-    protected virtual void Start()
+    protected override void Start()
     {
-        mTrackableBehaviour = GetComponent<TrackableBehaviour>();
-        if (mTrackableBehaviour)
-            mTrackableBehaviour.RegisterTrackableEventHandler(this);
-    }
-
-    protected virtual void OnDestroy()
-    {
-        if (mTrackableBehaviour)
-            mTrackableBehaviour.UnregisterTrackableEventHandler(this);
+        currentTrackable = null;
+        base.Start();
     }
 
     #endregion // UNITY_MONOBEHAVIOUR_METHODS
 
-    #region PUBLIC_METHODS
+    #region PROTECTED_METHODS
 
-    /// <summary>
-    ///     Implementation of the ITrackableEventHandler function called when the
-    ///     tracking state changes.
-    /// </summary>
-    public void OnTrackableStateChanged(
-        TrackableBehaviour.Status previousStatus,
-        TrackableBehaviour.Status newStatus)
+    protected override void OnTrackingFound()
     {
-        m_PreviousStatus = previousStatus;
-        m_NewStatus = newStatus;
-        
-        Debug.Log("Trackable " + mTrackableBehaviour.TrackableName + 
-                  " " + mTrackableBehaviour.CurrentStatus +
-                  " -- " + mTrackableBehaviour.CurrentStatusInfo);
+        string name = gameObject.name;
+        //Debug.Log("Tracking found: " + name);
 
-        if (newStatus == TrackableBehaviour.Status.DETECTED ||
-            newStatus == TrackableBehaviour.Status.TRACKED ||
-            newStatus == TrackableBehaviour.Status.EXTENDED_TRACKED)
+        if (currentTrackable == null)
         {
-            OnTrackingFound();
-        }
-        else if (previousStatus == TrackableBehaviour.Status.TRACKED &&
-                 newStatus == TrackableBehaviour.Status.NO_POSE)
-        {
-            OnTrackingLost();
+            currentTrackable = gameObject;
+            Debug.Log("Current trackable set to: " + name + ". Current status is " + m_NewStatus);
+            setChildEnabled(true);
         }
         else
         {
-            // For combo of previousStatus=UNKNOWN + newStatus=UNKNOWN|NOT_FOUND
-            // Vuforia is starting, but tracking has not been lost or found yet
-            // Call OnTrackingLost() to hide the augmentations
-            OnTrackingLost();
+            //NOTE: we may get this Found call even when this target was already tracked.
+            //maybe related to how both TRACKED and EXTENDED_TRACKED result in call to here.
+            if (gameObject != currentTrackable &&
+                gameObject != otherTrackable)
+            {
+                Debug.Log($"Remember additional trackable for later {gameObject.name} - is tracking {currentTrackable.name} already");
+                otherTrackable = gameObject;
+            }
+
+            // Is the currently tracked target on extended tracking and the target in queue isn't?
+            if (otherTrackable != null)
+            {
+                if (currentTrackable.GetComponent<MultiTrackableEventHandler>().m_NewStatus == TrackableBehaviour.Status.EXTENDED_TRACKED
+                && otherTrackable.GetComponent<MultiTrackableEventHandler>().m_NewStatus != TrackableBehaviour.Status.EXTENDED_TRACKED)
+                {
+                    Debug.Log("***Change target to " + gameObject.name + "***");
+                    currentTrackable.GetComponent<MultiTrackableEventHandler>().setChildEnabled(false);
+                    switchOtherToCurrent();
+                }
+            }
         }
     }
 
-    #endregion // PUBLIC_METHODS
-
-    #region PROTECTED_METHODS
-
-    protected virtual void OnTrackingFound()
+    protected override void OnTrackingLost()
     {
-        if (mTrackableBehaviour)
+        string name = gameObject.name;
+        Debug.Log("Tracking lost: " + name + ". Current status is " + m_NewStatus);
+
+        if (gameObject == currentTrackable)
         {
-            var rendererComponents = mTrackableBehaviour.GetComponentsInChildren<Renderer>(true);
-            var colliderComponents = mTrackableBehaviour.GetComponentsInChildren<Collider>(true);
-            var canvasComponents = mTrackableBehaviour.GetComponentsInChildren<Canvas>(true);
-
-            // Enable rendering:
-            foreach (var component in rendererComponents)
-                component.enabled = true;
-
-            // Enable colliders:
-            foreach (var component in colliderComponents)
-                component.enabled = true;
-
-            // Enable canvas':
-            foreach (var component in canvasComponents)
-                component.enabled = true;
+            if (otherTrackable != null)
+            {
+                switchOtherToCurrent();
+            }
+            else
+            {
+                currentTrackable = null;
+            }
         }
+        else if (gameObject == otherTrackable)
+        {
+            otherTrackable = null;
+        }
+        setChildEnabled(false);
     }
 
-
-    protected virtual void OnTrackingLost()
+    //adapted from DefaultTrackableEventHandler OnTrackingFound & *Lost, avoiding copy-paste of bool setting there
+    private void setChildEnabled(bool enabled)
     {
-        if (mTrackableBehaviour)
-        {
-            var rendererComponents = mTrackableBehaviour.GetComponentsInChildren<Renderer>(true);
-            var colliderComponents = mTrackableBehaviour.GetComponentsInChildren<Collider>(true);
-            var canvasComponents = mTrackableBehaviour.GetComponentsInChildren<Canvas>(true);
+        var rendererComponents = GetComponentsInChildren<Renderer>(true);
+        var colliderComponents = GetComponentsInChildren<Collider>(true);
+        var canvasComponents = GetComponentsInChildren<Canvas>(true);
 
-            // Disable rendering:
-            foreach (var component in rendererComponents)
-                component.enabled = false;
+        // Disable rendering:
+        foreach (var component in rendererComponents)
+            component.enabled = enabled;
 
-            // Disable colliders:
-            foreach (var component in colliderComponents)
-                component.enabled = false;
+        // Disable colliders:
+        foreach (var component in colliderComponents)
+            component.enabled = enabled;
 
-            // Disable canvas':
-            foreach (var component in canvasComponents)
-                component.enabled = false;
-        }
+        // Disable canvas':
+        foreach (var component in canvasComponents)
+            component.enabled = enabled;
+    }
+
+    private void switchOtherToCurrent()
+    {
+        otherTrackable.GetComponent<MultiTrackableEventHandler>().setChildEnabled(true);
+        currentTrackable = otherTrackable;
+        otherTrackable = null;
     }
 
     #endregion // PROTECTED_METHODS
